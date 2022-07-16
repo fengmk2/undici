@@ -7,6 +7,8 @@ const { table } = require('table')
 const { Writable } = require('stream')
 const { WritableStream } = require('stream/web')
 const { isMainThread } = require('worker_threads')
+const urllib = require('urllib')
+const urllibNext = require('urllib-next')
 
 const { Pool, Client, fetch, Agent, setGlobalDispatcher } = require('..')
 
@@ -129,7 +131,7 @@ function printResults (results) {
       ]
     })
 
-  console.log(results)
+  // console.log(results)
 
   // Add the header row
   rows.unshift(['Tests', 'Samples', 'Result', 'Tolerance', 'Difference with slowest'])
@@ -243,6 +245,16 @@ const experiments = {
   'undici - dispatch' () {
     return makeParallelRequests(resolve => {
       dispatcher.dispatch(undiciOptions, new SimpleRequest(resolve))
+    })
+  },
+  'urllib3 - request' () {
+    return makeParallelRequests(resolve => {
+      urllibNext.request(dest.url).then(() => resolve()).catch(console.log)
+    })
+  },
+  'urllib2 - request' () {
+    return makeParallelRequests(resolve => {
+      urllib.request(dest.url).then(() => resolve()).catch(console.log)
     })
   }
 }
