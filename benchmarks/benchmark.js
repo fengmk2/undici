@@ -252,6 +252,11 @@ const experiments = {
       urllibNext.request(dest.url).then(() => resolve()).catch(console.log)
     })
   },
+  'urllib3 enable timing - request' () {
+    return makeParallelRequests(resolve => {
+      urllibNext.request(dest.url, { timing: true }).then(() => resolve()).catch(console.log)
+    })
+  },
   'urllib2 - request' () {
     return makeParallelRequests(resolve => {
       urllib.request(dest.url).then(() => resolve()).catch(console.log)
