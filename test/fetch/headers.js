@@ -3,6 +3,9 @@
 const tap = require('tap')
 const { Headers, fill } = require('../../lib/fetch/headers')
 const { kGuard } = require('../../lib/fetch/symbols')
+const { once } = require('events')
+const { fetch } = require('../..')
+const { createServer } = require('http')
 
 tap.test('Headers initialization', t => {
   t.plan(8)
@@ -329,7 +332,7 @@ tap.test('Headers forEach', t => {
 })
 
 tap.test('Headers as Iterable', t => {
-  t.plan(8)
+  t.plan(7)
 
   t.test('should freeze values while iterating', t => {
     t.plan(1)
@@ -338,8 +341,8 @@ tap.test('Headers as Iterable', t => {
       ['bar', '456']
     ]
     const expected = [
-      ['x-bar', '456'],
-      ['x-foo', '123']
+      ['foo', '123'],
+      ['x-x-bar', '456']
     ]
     const headers = new Headers(init)
     for (const [key, val] of headers) {
@@ -347,28 +350,6 @@ tap.test('Headers as Iterable', t => {
       headers.set(`x-${key}`, val)
     }
     t.strictSame([...headers], expected)
-  })
-
-  t.test('prevent infinite, continuous iteration', t => {
-    t.plan(2)
-
-    const headers = new Headers({
-      z: 1,
-      y: 2,
-      x: 3
-    })
-
-    const order = []
-    for (const [key] of headers) {
-      order.push(key)
-      headers.append(key + key, 1)
-    }
-
-    t.strictSame(order, ['x', 'y', 'z'])
-    t.strictSame(
-      [...headers.keys()],
-      ['x', 'xx', 'y', 'yy', 'z', 'zz']
-    )
   })
 
   t.test('returns combined and sorted entries using .forEach()', t => {
@@ -684,6 +665,52 @@ tap.test('invalid headers', (t) => {
   t.throws(() => {
     new Headers().set('a', Symbol('symbol'))
   }, TypeError, 'symbols should throw')
+
+  t.end()
+})
+
+tap.test('headers that might cause a ReDoS', (t) => {
+  t.doesNotThrow(() => {
+    // This test will time out if the ReDoS attack is successful.
+    const headers = new Headers()
+    const attack = 'a' + '\t'.repeat(500_000) + '\ta'
+    headers.append('fhqwhgads', attack)
+  })
+
+  t.end()
+})
+
+tap.test('Headers.prototype.getSetCookie', (t) => {
+  t.test('Mutating the returned list does not affect the set-cookie list', (t) => {
+    const h = new Headers([
+      ['set-cookie', 'a=b'],
+      ['set-cookie', 'c=d']
+    ])
+
+    const old = h.getSetCookie()
+    h.getSetCookie().push('oh=no')
+    const now = h.getSetCookie()
+
+    t.same(old, now)
+    t.end()
+  })
+
+  // https://github.com/nodejs/undici/issues/1935
+  t.test('When Headers are cloned, so are the cookies', async (t) => {
+    const server = createServer((req, res) => {
+      res.setHeader('Set-Cookie', 'test=onetwo')
+      res.end('Hello World!')
+    }).listen(0)
+
+    await once(server, 'listening')
+    t.teardown(server.close.bind(server))
+
+    const res = await fetch(`http://localhost:${server.address().port}`)
+    const entries = Object.fromEntries(res.headers.entries())
+
+    t.same(res.headers.getSetCookie(), ['test=onetwo'])
+    t.ok('set-cookie' in entries)
+  })
 
   t.end()
 })

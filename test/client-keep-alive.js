@@ -2,6 +2,7 @@
 
 const { test } = require('tap')
 const { Client } = require('..')
+const timers = require('../lib/timers')
 const { kConnect } = require('../lib/core/symbols')
 const { createServer } = require('net')
 const http = require('http')
@@ -31,7 +32,7 @@ test('keep-alive header', (t) => {
       body.on('end', () => {
         const timeout = setTimeout(() => {
           t.fail()
-        }, 2e3)
+        }, 4e3)
         client.on('disconnect', () => {
           t.pass()
           clearTimeout(timeout)
@@ -46,6 +47,12 @@ test('keep-alive header 0', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((socket) => {
     socket.write('HTTP/1.1 200 OK\r\n')
@@ -135,7 +142,7 @@ test('keep-alive header no postfix', (t) => {
       body.on('end', () => {
         const timeout = setTimeout(() => {
           t.fail()
-        }, 2e3)
+        }, 4e3)
         client.on('disconnect', () => {
           t.pass()
           clearTimeout(timeout)
@@ -171,7 +178,7 @@ test('keep-alive not timeout', (t) => {
       body.on('end', () => {
         const timeout = setTimeout(() => {
           t.fail()
-        }, 2e3)
+        }, 3e3)
         client.on('disconnect', () => {
           t.pass()
           clearTimeout(timeout)
@@ -208,7 +215,7 @@ test('keep-alive threshold', (t) => {
       body.on('end', () => {
         const timeout = setTimeout(() => {
           t.fail()
-        }, 2e3)
+        }, 3e3)
         client.on('disconnect', () => {
           t.pass()
           clearTimeout(timeout)
@@ -245,7 +252,7 @@ test('keep-alive max keepalive', (t) => {
       body.on('end', () => {
         const timeout = setTimeout(() => {
           t.fail()
-        }, 2e3)
+        }, 3e3)
         client.on('disconnect', () => {
           t.pass()
           clearTimeout(timeout)

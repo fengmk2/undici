@@ -2,6 +2,7 @@
 
 const { test } = require('tap')
 const { BalancedPool, Pool, Client, errors } = require('..')
+const { nodeMajor } = require('../lib/core/util')
 const { createServer } = require('http')
 const { promisify } = require('util')
 
@@ -433,7 +434,10 @@ const cases = [
     expected: ['A', 'B', 'C', 'A', 'B', 'C/connectionRefused', 'A', 'B', 'A', 'B', 'A', 'B', 'C', 'A', 'B', 'C'],
     expectedConnectionRefusedErrors: 1,
     expectedSocketErrors: 0,
-    expectedRatios: [0.34, 0.34, 0.32]
+    expectedRatios: [0.34, 0.34, 0.32],
+
+    // Skip because the behavior of Node.js has changed
+    skip: nodeMajor >= 19
   },
 
   // 8
@@ -476,8 +480,8 @@ const cases = [
 
 ]
 
-for (const [index, { config, expected, expectedRatios, iterations = 9, expectedConnectionRefusedErrors = 0, expectedSocketErrors = 0, maxWeightPerServer, errorPenalty = 10 }] of cases.entries()) {
-  test(`weighted round robin - case ${index}`, async (t) => {
+for (const [index, { config, expected, expectedRatios, iterations = 9, expectedConnectionRefusedErrors = 0, expectedSocketErrors = 0, maxWeightPerServer, errorPenalty = 10, only = false, skip = false }] of cases.entries()) {
+  test(`weighted round robin - case ${index}`, { only, skip }, async (t) => {
     // cerate an array to store succesfull reqeusts
     const requestLog = []
 
@@ -511,7 +515,15 @@ for (const [index, { config, expected, expectedRatios, iterations = 9, expectedC
       try {
         await client.request({ path: '/', method: 'GET' })
       } catch (e) {
-        const serverWithError = servers.find(server => server.port === e.port) || servers.find(server => server.port === e.socket.remotePort)
+        const serverWithError =
+          servers.find(server => server.port === e.port) ||
+          servers.find(server => {
+            if (typeof AggregateError === 'function' && e instanceof AggregateError) {
+              return e.errors.some(e => server.port === (e.socket?.remotePort ?? e.port))
+            }
+
+            return server.port === e.socket.remotePort
+          })
 
         serverWithError.requestsCount++
 

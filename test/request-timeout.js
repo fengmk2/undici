@@ -4,6 +4,8 @@ const { test } = require('tap')
 const { createReadStream, writeFileSync, unlinkSync } = require('fs')
 const { Client, errors } = require('..')
 const { kConnect } = require('../lib/core/symbols')
+const { nodeMajor } = require('../lib/core/util')
+const timers = require('../lib/timers')
 const { createServer } = require('http')
 const EventEmitter = require('events')
 const FakeTimers = require('@sinonjs/fake-timers')
@@ -14,8 +16,6 @@ const {
   Writable,
   PassThrough
 } = require('stream')
-
-const nodeMajor = Number(process.versions.node.split('.')[0])
 
 test('request timeout', (t) => {
   t.plan(1)
@@ -65,6 +65,12 @@ test('body timeout', (t) => {
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
 
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
+
   const server = createServer((req, res) => {
     res.write('hello')
   })
@@ -93,6 +99,12 @@ test('overridden request timeout', (t) => {
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
 
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
+
   const server = createServer((req, res) => {
     setTimeout(() => {
       res.end('hello')
@@ -118,6 +130,12 @@ test('overridden body timeout', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
     res.write('hello')
@@ -146,6 +164,12 @@ test('With EE signal', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
     setTimeout(() => {
@@ -176,6 +200,12 @@ test('With abort-controller signal', (t) => {
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
 
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
+
   const server = createServer((req, res) => {
     setTimeout(() => {
       res.end('hello')
@@ -204,6 +234,12 @@ test('Abort before timeout (EE)', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const ee = new EventEmitter()
   const server = createServer((req, res) => {
@@ -234,6 +270,12 @@ test('Abort before timeout (abort-controller)', (t) => {
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
 
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
+
   const abortController = new AbortController()
   const server = createServer((req, res) => {
     setTimeout(() => {
@@ -262,6 +304,12 @@ test('Timeout with pipelining', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
     setTimeout(() => {
@@ -298,6 +346,12 @@ test('Global option', (t) => {
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
 
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
+
   const server = createServer((req, res) => {
     setTimeout(() => {
       res.end('hello')
@@ -325,6 +379,12 @@ test('Request options overrides global option', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
     setTimeout(() => {
@@ -376,6 +436,12 @@ test('client.close should wait for the timeout', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
   })
@@ -449,6 +515,12 @@ test('Disable request timeout', (t) => {
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
 
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
+
   const server = createServer((req, res) => {
     setTimeout(() => {
       res.end('hello')
@@ -484,6 +556,12 @@ test('Disable request timeout for a single request', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
     setTimeout(() => {
@@ -521,11 +599,17 @@ test('stream timeout', (t) => {
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
 
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
+
   const server = createServer((req, res) => {
     setTimeout(() => {
       res.end('hello')
-    }, 31e3)
-    clock.tick(31e3)
+    }, 301e3)
+    clock.tick(301e3)
   })
   t.teardown(server.close.bind(server))
 
@@ -550,6 +634,12 @@ test('stream custom timeout', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
     setTimeout(() => {
@@ -583,11 +673,17 @@ test('pipeline timeout', (t) => {
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
 
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
+
   const server = createServer((req, res) => {
     setTimeout(() => {
       req.pipe(res)
-    }, 31e3)
-    clock.tick(31e3)
+    }, 301e3)
+    clock.tick(301e3)
   })
   t.teardown(server.close.bind(server))
 
@@ -631,6 +727,12 @@ test('pipeline timeout', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
     setTimeout(() => {
@@ -682,6 +784,12 @@ test('client.close should not deadlock', (t) => {
 
   const clock = FakeTimers.install()
   t.teardown(clock.uninstall.bind(clock))
+
+  const orgTimers = { ...timers }
+  Object.assign(timers, { setTimeout, clearTimeout })
+  t.teardown(() => {
+    Object.assign(timers, orgTimers)
+  })
 
   const server = createServer((req, res) => {
   })

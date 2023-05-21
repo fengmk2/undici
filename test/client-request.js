@@ -1,3 +1,5 @@
+/* globals AbortController */
+
 'use strict'
 
 const { test } = require('tap')
@@ -9,9 +11,8 @@ const { Readable } = require('stream')
 const net = require('net')
 const { promisify } = require('util')
 const { NotSupportedError } = require('../lib/core/errors')
+const { nodeMajor } = require('../lib/core/util')
 const { parseFormDataString } = require('./utils/formdata')
-
-const nodeMajor = Number(process.versions.node.split('.')[0])
 
 test('request dump', (t) => {
   t.plan(3)
@@ -38,6 +39,61 @@ test('request dump', (t) => {
         dumped = true
         t.pass()
       })
+    })
+  })
+})
+
+test('request dump with abort signal', (t) => {
+  t.plan(2)
+  const server = createServer((req, res) => {
+    res.write('hello')
+  })
+  t.teardown(server.close.bind(server))
+
+  server.listen(0, () => {
+    const client = new Client(`http://localhost:${server.address().port}`)
+    t.teardown(client.destroy.bind(client))
+
+    client.request({
+      path: '/',
+      method: 'GET'
+    }, (err, { body }) => {
+      t.error(err)
+      let ac
+      if (!global.AbortController) {
+        const { AbortController } = require('abort-controller')
+        ac = new AbortController()
+      } else {
+        ac = new AbortController()
+      }
+      body.dump({ signal: ac.signal }).catch((err) => {
+        t.equal(err.name, 'AbortError')
+        server.close()
+      })
+      ac.abort()
+    })
+  })
+})
+
+test('request hwm', (t) => {
+  t.plan(2)
+  const server = createServer((req, res) => {
+    res.write('hello')
+  })
+  t.teardown(server.close.bind(server))
+
+  server.listen(0, () => {
+    const client = new Client(`http://localhost:${server.address().port}`)
+    t.teardown(client.destroy.bind(client))
+
+    client.request({
+      path: '/',
+      method: 'GET',
+      highWaterMark: 1000
+    }, (err, { body }) => {
+      t.error(err)
+      t.same(body.readableHighWaterMark, 1000)
+      body.dump()
     })
   })
 })

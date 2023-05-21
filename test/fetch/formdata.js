@@ -1,9 +1,11 @@
 'use strict'
 
 const { test } = require('tap')
-const { FormData, File } = require('../../')
+const { FormData, File, Response } = require('../../')
 const { Blob: ThirdPartyBlob } = require('formdata-node')
 const { Blob } = require('buffer')
+const { isFormDataLike } = require('../../lib/core/util')
+const ThirdPartyFormDataInvalid = require('form-data')
 
 test('arg validation', (t) => {
   const form = new FormData()
@@ -285,6 +287,88 @@ test('formData.constructor.name', (t) => {
   t.end()
 })
 
+test('formData should be an instance of FormData', (t) => {
+  t.plan(3)
+
+  t.test('Invalid class FormData', (t) => {
+    class FormData {
+      constructor () {
+        this.data = []
+      }
+
+      append (key, value) {
+        this.data.push([key, value])
+      }
+
+      get (key) {
+        return this.data.find(([k]) => k === key)
+      }
+    }
+
+    const form = new FormData()
+    t.equal(isFormDataLike(form), false)
+    t.end()
+  })
+
+  t.test('Invalid function FormData', (t) => {
+    function FormData () {
+      const data = []
+      return {
+        append (key, value) {
+          data.push([key, value])
+        },
+        get (key) {
+          return data.find(([k]) => k === key)
+        }
+      }
+    }
+
+    const form = new FormData()
+    t.equal(isFormDataLike(form), false)
+    t.end()
+  })
+
+  test('Invalid third-party FormData', (t) => {
+    const form = new ThirdPartyFormDataInvalid()
+    t.equal(isFormDataLike(form), false)
+    t.end()
+  })
+
+  t.test('Valid FormData', (t) => {
+    const form = new FormData()
+    t.equal(isFormDataLike(form), true)
+    t.end()
+  })
+})
+
+test('FormData should be compatible with third-party libraries', (t) => {
+  t.plan(1)
+
+  class FormData {
+    constructor () {
+      this.data = []
+    }
+
+    get [Symbol.toStringTag] () {
+      return 'FormData'
+    }
+
+    append () {}
+    delete () {}
+    get () {}
+    getAll () {}
+    has () {}
+    set () {}
+    entries () {}
+    keys () {}
+    values () {}
+    forEach () {}
+  }
+
+  const form = new FormData()
+  t.equal(isFormDataLike(form), true)
+})
+
 test('arguments', (t) => {
   t.equal(FormData.constructor.length, 1)
   t.equal(FormData.prototype.append.length, 2)
@@ -295,4 +379,23 @@ test('arguments', (t) => {
   t.equal(FormData.prototype.set.length, 2)
 
   t.end()
+})
+
+// https://github.com/nodejs/undici/pull/1814
+test('FormData returned from bodyMixin.formData is not a clone', async (t) => {
+  const fd = new FormData()
+  fd.set('foo', 'bar')
+
+  const res = new Response(fd)
+  fd.set('foo', 'foo')
+
+  const fd2 = await res.formData()
+
+  t.equal(fd2.get('foo'), 'bar')
+  t.equal(fd.get('foo'), 'foo')
+
+  fd2.set('foo', 'baz')
+
+  t.equal(fd2.get('foo'), 'baz')
+  t.equal(fd.get('foo'), 'foo')
 })

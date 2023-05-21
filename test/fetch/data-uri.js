@@ -9,8 +9,6 @@ const {
   collectAnHTTPQuotedString
 } = require('../../lib/fetch/dataURL')
 const { fetch } = require('../..')
-const base64tests = require('./resources/base64.json')
-const dataURLtests = require('./resources/data-urls.json')
 
 test('https://url.spec.whatwg.org/#concept-url-serializer', (t) => {
   t.test('url scheme gets appended', (t) => {
@@ -115,19 +113,22 @@ test('https://mimesniff.spec.whatwg.org/#parse-a-mime-type', (t) => {
   t.same(parseMIMEType('text/plain'), {
     type: 'text',
     subtype: 'plain',
-    parameters: new Map()
+    parameters: new Map(),
+    essence: 'text/plain'
   })
 
   t.same(parseMIMEType('text/html;charset="shift_jis"iso-2022-jp'), {
     type: 'text',
     subtype: 'html',
-    parameters: new Map([['charset', '"shift_jis"']])
+    parameters: new Map([['charset', 'shift_jis']]),
+    essence: 'text/html'
   })
 
   t.same(parseMIMEType('application/javascript'), {
     type: 'application',
     subtype: 'javascript',
-    parameters: new Map()
+    parameters: new Map(),
+    essence: 'application/javascript'
   })
 
   t.end()
@@ -161,71 +162,32 @@ test('https://fetch.spec.whatwg.org/#collect-an-http-quoted-string', (t) => {
   t.end()
 })
 
-// https://github.com/web-platform-tests/wpt/blob/master/fetch/data-urls/resources/base64.json
-// https://github.com/web-platform-tests/wpt/blob/master/fetch/data-urls/base64.any.js
-test('base64.any.js', async (t) => {
-  for (const [input, output] of base64tests) {
-    const dataURL = `data:;base64,${input}`
-
-    if (output === null) {
-      await t.rejects(fetch(dataURL), TypeError)
-      continue
-    }
-
-    try {
-      const res = await fetch(dataURL)
-      const body = await res.arrayBuffer()
-
-      t.same(
-        new Uint8Array(body),
-        new Uint8Array(output)
-      )
-    } catch (e) {
-      t.fail(`failed to fetch ${dataURL}`)
-    }
+// https://github.com/nodejs/undici/issues/1574
+test('too long base64 url', async (t) => {
+  const inputStr = 'a'.repeat(1 << 20)
+  const base64 = Buffer.from(inputStr).toString('base64')
+  const dataURIPrefix = 'data:application/octet-stream;base64,'
+  const dataURL = dataURIPrefix + base64
+  try {
+    const res = await fetch(dataURL)
+    const buf = await res.arrayBuffer()
+    const outputStr = Buffer.from(buf).toString('ascii')
+    t.same(outputStr, inputStr)
+  } catch (e) {
+    t.fail(`failed to fetch ${dataURL}`)
   }
 })
 
-test('processing.any.js', async (t) => {
-  for (const [input, expectedMimeType, expectedBody = null] of dataURLtests) {
-    if (expectedMimeType === null) {
-      try {
-        await fetch(input)
-        t.fail(`fetching "${input}" was expected to fail`)
-      } catch (e) {
-        t.ok(e, 'got expected error')
-        continue
-      }
-    }
+test('https://domain.com/#', (t) => {
+  t.plan(1)
+  const domain = 'https://domain.com/#a'
+  const serialized = URLSerializer(new URL(domain))
+  t.equal(serialized, domain)
+})
 
-    try {
-      const res = await fetch(input)
-      const body = await res.arrayBuffer()
-
-      t.same(
-        new Uint8Array(body),
-        new Uint8Array(expectedBody)
-      )
-    } catch (e) {
-      t.fail(`failed on '${input}'`)
-    }
-  }
-
-  // https://github.com/nodejs/undici/issues/1574
-  test('too long base64 url', async (t) => {
-    const inputStr = 'a'.repeat(1 << 20)
-    const base64 = Buffer.from(inputStr).toString('base64')
-    const dataURIPrefix = 'data:application/octet-stream;base64,'
-    const dataURL = dataURIPrefix + base64
-    try {
-      const res = await fetch(dataURL)
-      const buf = await res.arrayBuffer()
-      const outputStr = Buffer.from(buf).toString('ascii')
-      t.same(outputStr, inputStr)
-    } catch (e) {
-      t.fail(`failed to fetch ${dataURL}`)
-    }
-  })
-
-  t.end()
+test('https://domain.com/?', (t) => {
+  t.plan(1)
+  const domain = 'https://domain.com/?a=b'
+  const serialized = URLSerializer(new URL(domain))
+  t.equal(serialized, domain)
 })

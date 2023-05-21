@@ -185,6 +185,30 @@ describe('node-fetch', () => {
     })
   })
 
+  it('should send request with custom headers array', () => {
+    const url = `${base}inspect`
+    const options = {
+      headers: { 'x-custom-header': ['abc'] }
+    }
+    return fetch(url, options).then(res => {
+      return res.json()
+    }).then(res => {
+      expect(res.headers['x-custom-header']).to.equal('abc')
+    })
+  })
+
+  it('should send request with multi-valued headers', () => {
+    const url = `${base}inspect`
+    const options = {
+      headers: { 'x-custom-header': ['abc', '123'] }
+    }
+    return fetch(url, options).then(res => {
+      return res.json()
+    }).then(res => {
+      expect(res.headers['x-custom-header']).to.equal('abc,123')
+    })
+  })
+
   it('should accept headers instance', () => {
     const url = `${base}inspect`
     const options = {
@@ -616,15 +640,13 @@ describe('node-fetch', () => {
     })
   })
 
-  xit('should decompress slightly invalid gzip response', () => {
+  it('should decompress slightly invalid gzip response', async () => {
     const url = `${base}gzip-truncated`
-    return fetch(url).then(res => {
-      expect(res.headers.get('content-type')).to.equal('text/plain')
-      return res.text().then(result => {
-        expect(result).to.be.a('string')
-        expect(result).to.equal('hello world')
-      })
-    })
+    const res = await fetch(url)
+    expect(res.headers.get('content-type')).to.equal('text/plain')
+    const result = await res.text()
+    expect(result).to.be.a('string')
+    expect(result).to.equal('hello world')
   })
 
   it('should decompress deflate response', () => {
@@ -880,7 +902,7 @@ describe('node-fetch', () => {
           return expect(res.text())
             .to.eventually.be.rejected
             .and.be.an.instanceof(Error)
-            .and.have.property('name', 'TypeError')
+            .and.have.property('name', 'AbortError')
         })
     })
   })
@@ -1135,7 +1157,8 @@ describe('node-fetch', () => {
     const url = `${base}inspect`
     const options = {
       method: 'POST',
-      body: stream.Readable.from('a=1')
+      body: stream.Readable.from('a=1'),
+      duplex: 'half'
     }
     return fetch(url, options).then(res => {
       return res.json()
@@ -1531,30 +1554,8 @@ describe('node-fetch', () => {
     })
   })
 
-  it('should keep `?` sign in URL when no params are given', () => {
-    const url = `${base}question?`
-    const urlObject = new URL(url)
-    const request = new Request(urlObject)
-    return fetch(request).then(res => {
-      expect(res.url).to.equal(url)
-      expect(res.ok).to.be.true
-      expect(res.status).to.equal(200)
-    })
-  })
-
   it('if params are given, do not modify anything', () => {
     const url = `${base}question?a=1`
-    const urlObject = new URL(url)
-    const request = new Request(urlObject)
-    return fetch(request).then(res => {
-      expect(res.url).to.equal(url)
-      expect(res.ok).to.be.true
-      expect(res.status).to.equal(200)
-    })
-  })
-
-  it('should preserve the hash (#) symbol', () => {
-    const url = `${base}question?#`
     const urlObject = new URL(url)
     const request = new Request(urlObject)
     return fetch(request).then(res => {
@@ -1645,7 +1646,7 @@ describe('node-fetch', () => {
 
   it('should allow manual redirect handling', function () {
     this.timeout(5000)
-    const url = 'https://httpbin.org/status/302'
+    const url = `${base}redirect/302`
     const options = {
       redirect: 'manual'
     }
@@ -1653,24 +1654,8 @@ describe('node-fetch', () => {
       expect(res.status).to.equal(302)
       expect(res.url).to.equal(url)
       expect(res.type).to.equal('basic')
-      expect(res.headers.get('Location')).to.equal('/redirect/1')
+      expect(res.headers.get('Location')).to.equal('/inspect')
       expect(res.ok).to.be.false
     })
   })
-
-  // it('should not time out waiting for a response 60 seconds', function () {
-  //   this.timeout(65_000)
-  //   return fetch(`${base}timeout60s`).then(res => {
-  //     expect(res.status).to.equal(200)
-  //     expect(res.ok).to.be.true
-  //     return res.text().then(result => {
-  //       expect(result).to.equal('text')
-  //     })
-  //   })
-  // })
-
-  // it('should time out waiting for more than 300 seconds', function () {
-  //   this.timeout(305_000)
-  //   return expect(fetch(`${base}timeout300s`)).to.eventually.be.rejectedWith(TypeError)
-  // })
 })

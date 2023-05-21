@@ -2,15 +2,18 @@
 
 'use strict'
 
-const { test } = require('tap')
+const { test, teardown } = require('tap')
 const { createServer } = require('http')
 const { ReadableStream } = require('stream/web')
 const { Blob } = require('buffer')
 const { fetch, Response, Request, FormData, File } = require('../..')
 const { Client, setGlobalDispatcher, Agent } = require('../..')
+const { nodeMajor, nodeMinor } = require('../../lib/core/util')
 const nodeFetch = require('../../index-fetch')
 const { once } = require('events')
 const { gzipSync } = require('zlib')
+const { promisify } = require('util')
+const { randomFillSync, createHash } = require('crypto')
 
 setGlobalDispatcher(new Agent({
   keepAliveTimeout: 1,
@@ -109,7 +112,8 @@ test('pre aborted with readable request body', (t) => {
         async cancel (reason) {
           t.equal(reason.name, 'AbortError')
         }
-      })
+      }),
+      duplex: 'half'
     }).catch(err => {
       t.equal(err.name, 'AbortError')
     })
@@ -139,7 +143,8 @@ test('pre aborted with closed readable request body', (t) => {
       fetch(`http://localhost:${server.address().port}`, {
         signal: ac.signal,
         method: 'POST',
-        body
+        body,
+        duplex: 'half'
       }).catch(err => {
         t.equal(err.name, 'AbortError')
       })
@@ -165,11 +170,51 @@ test('unsupported formData 1', (t) => {
   })
 })
 
-test('unsupported formData 2', (t) => {
-  t.plan(1)
+test('multipart formdata not base64', async (t) => {
+  t.plan(2)
+  // Construct example form data, with text and blob fields
+  const formData = new FormData()
+  formData.append('field1', 'value1')
+  const blob = new Blob(['example\ntext file'], { type: 'text/plain' })
+  formData.append('field2', blob, 'file.txt')
+
+  const tempRes = new Response(formData)
+  const boundary = tempRes.headers.get('content-type').split('boundary=')[1]
+  const formRaw = await tempRes.text()
 
   const server = createServer((req, res) => {
-    res.setHeader('content-type', 'multipart/form-data')
+    res.setHeader('content-type', 'multipart/form-data; boundary=' + boundary)
+    res.write(formRaw)
+    res.end()
+  })
+  t.teardown(server.close.bind(server))
+
+  const listen = promisify(server.listen.bind(server))
+  await listen(0)
+
+  const res = await fetch(`http://localhost:${server.address().port}`)
+  const form = await res.formData()
+  t.equal(form.get('field1'), 'value1')
+
+  const text = await form.get('field2').text()
+  t.equal(text, 'example\ntext file')
+})
+
+// TODO(@KhafraDev): re-enable this test once the issue is fixed
+// See https://github.com/nodejs/node/issues/47301
+test('multipart formdata base64', { skip: nodeMajor >= 19 && nodeMinor >= 8 }, (t) => {
+  t.plan(1)
+
+  // Example form data with base64 encoding
+  const data = randomFillSync(Buffer.alloc(256))
+  const formRaw = `------formdata-undici-0.5786922755719377\r\nContent-Disposition: form-data; name="file"; filename="test.txt"\r\nContent-Type: application/octet-stream\r\nContent-Transfer-Encoding: base64\r\n\r\n${data.toString('base64')}\r\n------formdata-undici-0.5786922755719377--`
+  const server = createServer(async (req, res) => {
+    res.setHeader('content-type', 'multipart/form-data; boundary=----formdata-undici-0.5786922755719377')
+
+    for (let offset = 0; offset < formRaw.length;) {
+      res.write(formRaw.slice(offset, offset += 2))
+      await new Promise(resolve => setTimeout(resolve))
+    }
     res.end()
   })
   t.teardown(server.close.bind(server))
@@ -177,10 +222,54 @@ test('unsupported formData 2', (t) => {
   server.listen(0, () => {
     fetch(`http://localhost:${server.address().port}`)
       .then(res => res.formData())
-      .catch(err => {
-        t.equal(err.name, 'NotSupportedError')
+      .then(form => form.get('file').arrayBuffer())
+      .then(buffer => createHash('sha256').update(Buffer.from(buffer)).digest('base64'))
+      .then(digest => {
+        t.equal(createHash('sha256').update(data).digest('base64'), digest)
       })
   })
+})
+
+test('multipart fromdata non-ascii filed names', async (t) => {
+  t.plan(1)
+
+  const request = new Request('http://localhost', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'multipart/form-data; boundary=----formdata-undici-0.6204674738279623'
+    },
+    body:
+      '------formdata-undici-0.6204674738279623\r\n' +
+      'Content-Disposition: form-data; name="fiŝo"\r\n' +
+      '\r\n' +
+      'value1\r\n' +
+      '------formdata-undici-0.6204674738279623--'
+  })
+
+  const form = await request.formData()
+  t.equal(form.get('fiŝo'), 'value1')
+})
+
+test('busboy emit error', async (t) => {
+  t.plan(1)
+  const formData = new FormData()
+  formData.append('field1', 'value1')
+
+  const tempRes = new Response(formData)
+  const formRaw = await tempRes.text()
+
+  const server = createServer((req, res) => {
+    res.setHeader('content-type', 'multipart/form-data; boundary=wrongboundary')
+    res.write(formRaw)
+    res.end()
+  })
+  t.teardown(server.close.bind(server))
+
+  const listen = promisify(server.listen.bind(server))
+  await listen(0)
+
+  const res = await fetch(`http://localhost:${server.address().port}`)
+  await t.rejects(res.formData(), 'Unexpected end of multipart data')
 })
 
 test('urlencoded formData', (t) => {
@@ -250,7 +339,7 @@ test('locked blob body', (t) => {
     const res = await fetch(`http://localhost:${server.address().port}`)
     const reader = res.body.getReader()
     res.blob().catch(err => {
-      t.equal(err.message, 'The stream is locked.')
+      t.equal(err.message, 'Body is unusable')
       reader.cancel()
     })
   })
@@ -270,7 +359,7 @@ test('disturbed blob body', (t) => {
       t.pass(2)
     })
     res.blob().catch(err => {
-      t.equal(err.message, 'The body has already been consumed.')
+      t.equal(err.message, 'Body is unusable')
     })
   })
 })
@@ -583,3 +672,5 @@ test('Receiving non-Latin1 headers', async (t) => {
   t.same(lengths, [30, 34, 94, 104, 90])
   t.end()
 })
+
+teardown(() => process.exit())

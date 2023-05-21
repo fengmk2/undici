@@ -2,6 +2,7 @@
 
 const { test } = require('tap')
 const { createServer } = require('http')
+const { nodeMajor, nodeMinor } = require('../../lib/core/util')
 const { fetch } = require('../..')
 
 const {
@@ -9,12 +10,11 @@ const {
   performance
 } = require('perf_hooks')
 
-const semver = require('semver')
-
-const skip = semver.lt(process.version, '18.2.0')
+const skip = nodeMajor < 18 || (nodeMajor === 18 && nodeMinor < 2)
 
 test('should create a PerformanceResourceTiming after each fetch request', { skip }, (t) => {
-  t.plan(4)
+  t.plan(6)
+
   const obs = new PerformanceObserver(list => {
     const entries = list.getEntries()
     t.equal(entries.length, 1)
@@ -26,6 +26,9 @@ test('should create a PerformanceResourceTiming after each fetch request', { ski
     })
     t.strictSame(entry.entryType, 'resource')
 
+    t.ok(entry.duration >= 0)
+    t.ok(entry.startTime >= 0)
+
     obs.disconnect()
     performance.clearResourceTimings()
   })
@@ -34,11 +37,10 @@ test('should create a PerformanceResourceTiming after each fetch request', { ski
 
   const server = createServer((req, res) => {
     res.end('ok')
-  })
-  t.teardown(server.close.bind(server))
-
-  server.listen(0, async () => {
+  }).listen(0, async () => {
     const body = await fetch(`http://localhost:${server.address().port}`)
     t.strictSame('ok', await body.text())
   })
+
+  t.teardown(server.close.bind(server))
 })

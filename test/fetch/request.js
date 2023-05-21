@@ -2,18 +2,18 @@
 
 'use strict'
 
-const { test } = require('tap')
+const { test, teardown } = require('tap')
 const {
   Request,
   Headers,
   fetch
 } = require('../../')
-const { kState } = require('../../lib/fetch/symbols.js')
 const {
   Blob: ThirdPartyBlob,
   FormData: ThirdPartyFormData
 } = require('formdata-node')
-const hasSignalReason = !!~process.version.localeCompare('v16.14.0', undefined, { numeric: true })
+
+const hasSignalReason = 'reason' in AbortSignal.prototype
 
 test('arg validation', async (t) => {
   // constructor
@@ -198,7 +198,7 @@ test('undefined window', t => {
 
 test('undefined body', t => {
   const req = new Request('http://asd', { body: undefined })
-  t.equal(req[kState].body, null)
+  t.equal(req.body, null)
   t.end()
 })
 
@@ -297,7 +297,7 @@ test('post aborted signal', t => {
     } else {
       t.pass()
     }
-  })
+  }, { once: true })
   ac.abort('gwak')
 })
 
@@ -345,7 +345,7 @@ test('post aborted signal cloned', t => {
     } else {
       t.pass()
     }
-  })
+  }, { once: true })
   ac.abort('gwak')
 })
 
@@ -459,3 +459,32 @@ test('constructing Request with third party FormData body', async (t) => {
   t.equal(contentType[0], 'multipart/form-data; boundary')
   t.ok((await req.text()).startsWith(`--${contentType[1]}`))
 })
+
+// https://github.com/nodejs/undici/issues/2050
+test('set-cookie headers get cleared when passing a Request as first param', (t) => {
+  const req1 = new Request('http://localhost', {
+    headers: {
+      'set-cookie': 'a=1'
+    }
+  })
+
+  t.same([...req1.headers], [['set-cookie', 'a=1']])
+  const req2 = new Request(req1, { headers: {} })
+
+  t.same([...req2.headers], [])
+  t.same(req2.headers.getSetCookie(), [])
+  t.end()
+})
+
+// https://github.com/nodejs/undici/issues/2124
+test('request.referrer', (t) => {
+  for (const referrer of ['about://client', 'about://client:1234']) {
+    const request = new Request('http://a', { referrer })
+
+    t.equal(request.referrer, 'about:client')
+  }
+
+  t.end()
+})
+
+teardown(() => process.exit())
