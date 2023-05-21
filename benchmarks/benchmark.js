@@ -68,6 +68,78 @@ const undiciOptions = {
   bodyTimeout
 }
 
+const undiciOptionsWithHighWaterMark1MB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 1 * 1024 * 1024
+}
+
+const undiciOptionsWithHighWaterMark2MB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 2 * 1024 * 1024
+}
+
+const undiciOptionsWithHighWaterMark5MB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 5 * 1024 * 1024
+}
+
+const undiciOptionsWithHighWaterMark10MB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 10 * 1024 * 1024
+}
+
+const undiciOptionsWithHighWaterMark128KB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 128 * 1024
+}
+
+const undiciOptionsWithHighWaterMark256KB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 256 * 1024
+}
+
+const undiciOptionsWithHighWaterMark512KB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 512 * 1024
+}
+
+const undiciOptionsWithHighWaterMark16KB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 16 * 1024
+}
+
+const undiciOptionsWithHighWaterMark1KB = {
+  path: '/',
+  method: 'GET',
+  headersTimeout,
+  bodyTimeout,
+  highWaterMark: 1 * 1024
+}
+
 const Class = connections > 1 ? Pool : Client
 const dispatcher = new Class(httpBaseOptions.url, {
   pipelining,
@@ -142,7 +214,7 @@ function printResults (results) {
   // console.log(results)
 
   // Add the header row
-  rows.unshift(['Tests', 'Samples', 'Result', 'Tolerance', 'Difference with slowest'])
+  rows.unshift([`Tests on connections: ${connections}`, 'Samples', 'Result', 'Tolerance', 'Difference with slowest'])
 
   return table(rows, {
     columns: {
@@ -225,6 +297,141 @@ const experiments = {
   'undici - request' () {
     return makeParallelRequests(resolve => {
       dispatcher.request(undiciOptions).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 1KB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark1KB).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 16KB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark16KB).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 128KB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark128KB).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 256KB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark256KB).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 512KB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark512KB).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 1MB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark1MB).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 2MB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark2MB).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 5MB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark5MB).then(({ body }) => {
+        body
+          .pipe(
+            new Writable({
+              write (chunk, encoding, callback) {
+                callback()
+              }
+            })
+          )
+          .on('finish', resolve)
+      })
+    })
+  },
+  'undici - request on hwm 10MB' () {
+    return makeParallelRequests(resolve => {
+      dispatcher.request(undiciOptionsWithHighWaterMark10MB).then(({ body }) => {
         body
           .pipe(
             new Writable({
