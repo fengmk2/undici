@@ -5,6 +5,9 @@ const os = require('node:os')
 const path = require('node:path')
 const { Writable } = require('node:stream')
 const { isMainThread } = require('node:worker_threads')
+const urllib2 = require('urllib2')
+const urllib3 = require('urllib3')
+const urllib4 = require('urllib4')
 
 const { Pool, Client, fetch, Agent, setGlobalDispatcher } = require('..')
 
@@ -215,6 +218,21 @@ const experiments = {
   'undici - dispatch' () {
     return makeParallelRequests(resolve => {
       dispatcher.dispatch(undiciOptions, new SimpleRequest(resolve))
+    })
+  },
+  'urllib2 - request' () {
+    return makeParallelRequests(resolve => {
+      return urllib2.request(dest.url).then(() => resolve())
+    })
+  },
+  'urllib3 - request' () {
+    return makeParallelRequests(resolve => {
+      return urllib3.request(dest.url).then(() => resolve())
+    })
+  },
+  'urllib4 - request' () {
+    return makeParallelRequests(resolve => {
+      return urllib4.request(dest.url).then(() => resolve())
     })
   }
 }
