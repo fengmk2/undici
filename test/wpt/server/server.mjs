@@ -7,8 +7,10 @@ import { createReadStream, readFileSync, existsSync } from 'node:fs'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { route as networkPartitionRoute } from './routes/network-partition-key.mjs'
 import { route as redirectRoute } from './routes/redirect.mjs'
+import { Pipeline } from './util.mjs'
+import { symbols } from './constants.mjs'
 
-const tests = fileURLToPath(join(import.meta.url, '../../tests'))
+const tests = fileURLToPath(join(import.meta.url, '../../../fixtures/wpt'))
 
 // https://web-platform-tests.org/tools/wptserve/docs/stash.html
 class Stash extends Map {
@@ -31,11 +33,17 @@ const stash = new Stash()
 const server = createServer(async (req, res) => {
   const fullUrl = new URL(req.url, `http://localhost:${server.address().port}`)
 
+  if (fullUrl.searchParams.has('pipe')) {
+    const pipe = new Pipeline(fullUrl.searchParams.get('pipe'))
+    res = await pipe.call(req, res)
+  }
+
   switch (fullUrl.pathname) {
     case '/service-workers/cache-storage/resources/blank.html': {
       res.setHeader('content-type', 'text/html')
       // fall through
     }
+    case '/fetch/content-encoding/resources/big.text.gz':
     case '/service-workers/cache-storage/resources/simple.txt':
     case '/fetch/content-encoding/resources/foo.octetstream.gz':
     case '/fetch/content-encoding/resources/foo.text.gz':
@@ -54,7 +62,8 @@ const server = createServer(async (req, res) => {
     case '/fetch/data-urls/resources/base64.json':
     case '/fetch/data-urls/resources/data-urls.json':
     case '/fetch/api/resources/empty.txt':
-    case '/fetch/api/resources/data.json': {
+    case '/fetch/api/resources/data.json':
+    case '/common/text-plain.txt': {
       // If this specific resources requires custom headers
       const customHeadersPath = join(tests, fullUrl.pathname + '.headers')
       if (existsSync(customHeadersPath)) {
@@ -73,9 +82,11 @@ const server = createServer(async (req, res) => {
       }
 
       // https://github.com/web-platform-tests/wpt/blob/6ae3f702a332e8399fab778c831db6b7dca3f1c6/fetch/api/resources/data.json
-      return createReadStream(join(tests, fullUrl.pathname))
+      createReadStream(join(tests, fullUrl.pathname))
         .on('end', () => res.end())
         .pipe(res)
+
+      break
     }
     case '/fetch/api/resources/trickle.py': {
       // Note: python's time.sleep(...) takes seconds, while setTimeout
@@ -132,7 +143,7 @@ const server = createServer(async (req, res) => {
       }
 
       res.end()
-      return
+      break
     }
     case '/fetch/api/resources/stash-take.py': {
       // https://github.com/web-platform-tests/wpt/blob/6ae3f702a332e8399fab778c831db6b7dca3f1c6/fetch/api/resources/stash-take.py
@@ -143,7 +154,8 @@ const server = createServer(async (req, res) => {
       const took = stash.take(key, fullUrl.pathname) ?? null
 
       res.write(JSON.stringify(took))
-      return res.end()
+      res.end()
+      break
     }
     case '/fetch/api/resources/echo-content.py': {
       res.setHeader('X-Request-Method', req.method)
@@ -156,6 +168,22 @@ const server = createServer(async (req, res) => {
       }
 
       res.end()
+      break
+    }
+    case '/fetch/api/resources/cache.py': {
+      if (req.headers['if-none-match'] === '"123abc"') {
+        res.statusCode = 304
+        res.statusMessage = 'Not Modified'
+        res.setHeader('X-HTTP-STATUS', '304')
+        res.end()
+      } else {
+        // cache miss, so respond with the actual content
+        res.statusCode = 200
+        res.statusMessage = 'OK'
+        res.setHeader('Content-Type', 'text/plain')
+        res.setHeader('ETag', '"123abc"')
+        res.end('lorem ipsum dolor sit amet')
+      }
       break
     }
     case '/fetch/api/resources/status.py': {
@@ -251,15 +279,19 @@ const server = createServer(async (req, res) => {
       break
     }
     case '/fetch/connection-pool/resources/network-partition-key.py': {
-      return networkPartitionRoute(req, res, fullUrl)
+      networkPartitionRoute(req, res, fullUrl)
+      break
     }
     case '/resources/top.txt': {
-      return createReadStream(join(tests, 'fetch/api/', fullUrl.pathname))
+      createReadStream(join(tests, 'fetch/api/', fullUrl.pathname))
         .on('end', () => res.end())
         .pipe(res)
+
+      break
     }
     case '/fetch/api/resources/redirect.py': {
-      return redirectRoute(req, res, fullUrl)
+      redirectRoute(req, res, fullUrl)
+      break
     }
     case '/fetch/api/resources/method.py': {
       if (fullUrl.searchParams.has('cors')) {
@@ -282,7 +314,7 @@ const server = createServer(async (req, res) => {
       }
 
       res.end()
-      return
+      break
     }
     case '/fetch/api/resources/clean-stash.py': {
       const token = fullUrl.searchParams.get('token')
@@ -317,7 +349,7 @@ const server = createServer(async (req, res) => {
 
       if (req.headers.authorization) {
         res.end(req.headers.authorization)
-        return
+        break
       }
 
       res.end('none')
@@ -346,7 +378,7 @@ const server = createServer(async (req, res) => {
 
       if (user === 'user' && password === 'password') {
         res.end('Authentication done')
-        return
+        break
       }
 
       const realm = fullUrl.searchParams.get('realm') ?? 'test'
@@ -354,25 +386,96 @@ const server = createServer(async (req, res) => {
       res.statusCode = 401
       res.setHeader('WWW-Authenticate', `Basic realm="${realm}"`)
       res.end('Please login with credentials \'user\' and \'password\'')
-      return
+      break
     }
     case '/fetch/api/resources/redirect-empty-location.py': {
       res.setHeader('location', '')
       res.statusCode = 302
       res.end('')
-      return
+      break
     }
     case '/service-workers/cache-storage/resources/fetch-status.py': {
       const status = Number(fullUrl.searchParams.get('status'))
 
       res.statusCode = status
       res.end()
-      return
+      break
+    }
+    case '/service-workers/cache-storage/this-resource-should-not-exist':
+    case '/service-workers/cache-storage/this-does-not-exist-please-dont-create-it': {
+      res.statusCode = 404
+      res.end()
+      break
+    }
+    case '/service-workers/cache-storage/resources/vary.py': {
+      if (fullUrl.searchParams.has('clear-vary-value-override-cookie')) {
+        res.setHeader('cookie', '')
+        res.end('vary cookie cleared')
+        break
+      }
+
+      const setCookieVary = fullUrl.searchParams.get('set-vary-value-override-cookie') ?? ''
+
+      if (setCookieVary) {
+        res.setHeader('set-cookie', `vary-value-override=${setCookieVary}`)
+        res.end('vary cookie set')
+        break
+      }
+
+      const cookieVary = req.headers.cookie?.split(';').find((c) => c.includes('vary-value-override='))
+
+      if (cookieVary) {
+        res.setHeader('vary', `${cookieVary}`)
+      } else {
+        const queryVary = fullUrl.searchParams.get('vary')
+
+        if (queryVary) {
+          res.setHeader('vary', queryVary)
+        }
+      }
+
+      res.end('vary response')
+      break
+    }
+    case '/eventsource/resources/message.py': {
+      const mime = fullUrl.searchParams.get('mime') ?? 'text/event-stream'
+      const message = fullUrl.searchParams.get('message') ?? 'data: data'
+      const newline = fullUrl.searchParams.get('newline') === 'none' ? '' : '\n\n'
+      const sleep = parseInt(fullUrl.searchParams.get('sleep') ?? '0')
+
+      res.setHeader('content-type', mime)
+      res.write(message + newline + '\n')
+
+      setTimeout(() => {
+        res.end()
+      }, sleep)
+
+      break
+    }
+    case '/eventsource/resources/last-event-id.py': {
+      const lastEventId = req.headers['Last-Event-ID'] ?? ''
+      const idValue = fullUrl.searchParams.get('idvalue') ?? '\u2026'
+
+      res.setHeader('content-type', 'text/event-stream')
+
+      if (lastEventId) {
+        res.write(`data: ${lastEventId}\n\n`)
+        res.end()
+      } else {
+        res.write(`id: ${idValue}\nretry: 200\ndata: hello\n\n`)
+        res.end()
+      }
+
+      break
     }
     default: {
       res.statusCode = 200
       res.end(fullUrl.toString())
     }
+  }
+
+  if (res[symbols.kContent]) {
+    res.write(res[symbols.kContent])
   }
 }).listen(0)
 
@@ -384,7 +487,9 @@ const send = (message) => {
   }
 }
 
-send({ server: `http://localhost:${server.address().port}` })
+const url = `http://localhost:${server.address().port}`
+console.log('server opened ' + url)
+send({ server: url })
 
 process.on('message', (message) => {
   if (message === 'shutdown') {

@@ -3,10 +3,7 @@
     "abort": {
       "general.any.js": {
         "fail": [
-          "Already aborted signal rejects immediately",
-          "Underlying connection is closed when aborting after receiving response - no-cors",
-          "Stream errors once aborted. Underlying connection closed.",
-          "Readable stream synchronously cancels with AbortError if aborted before reading"
+          "Already aborted signal rejects immediately"
         ]
       },
       "cache.https.any.js": {
@@ -18,7 +15,8 @@
       "conditional-get.any.js": {
         "fail": [
           "Testing conditional GET with ETags"
-        ]
+        ],
+        "note": "undici doesn't keep track of etags"
       },
       "header-value-combining.any.js": {
         "fail": [
@@ -51,9 +49,6 @@
       },
       "referrer.any.js": {
         "fail": [
-          "origin-when-cross-origin policy on a cross-origin URL",
-          "origin-when-cross-origin policy on a cross-origin URL after same-origin redirection",
-          "origin-when-cross-origin policy on a same-origin URL after cross-origin redirection",
           "origin-when-cross-origin policy on a same-origin URL"
         ]
       },
@@ -66,24 +61,34 @@
           "Fetch with Chicken",
           "Fetch with Chicken with body",
           "Fetch with TacO and mode \"same-origin\" needs an Origin header",
-          "Fetch with TacO and mode \"cors\" needs an Origin header"
+          "Fetch with TacO and mode \"cors\" needs an Origin header",
+          "Fetch with POST with Float16Array body"
         ]
       },
-      "request-referrer.any.js": {
-        "note": "TODO(@KhafraDev): url referrer test could probably be fixed",
-        "fail": [
-          "about:client referrer",
-          "url referrer"
-        ]
+      "request-private-network-headers.tentative.any.js": {
+        "note": "undici doesn't filter headers",
+        "skip": true
       },
       "request-upload.any.js": {
+        "note": "no Float16Array",
         "fail": [
-          "Fetch with POST with text body on 421 response should be retried once on new connection."	
+          "Fetch with POST with Float16Array body"
         ]
       },
       "request-upload.h2.any.js": {
         "note": "undici doesn't support http/2",
         "skip": true
+      },
+      "scheme-blob.sub.any.js": {
+        "note": "fail: fails everywhere, flaky: only node 18",
+        "fail": [
+          "Fetching URL.createObjectURL(invalid_type_blob) is OK"
+        ],
+        "flaky": [
+          "Fetching URL.createObjectURL(empty_blob) is OK",
+          "Fetching URL.createObjectURL(empty_type_blob) is OK",
+          "Fetching URL.createObjectURL(empty_data_blob) is OK"
+        ]
       },
       "status.h2.any.js": {
         "note": "undici doesn't support http/2",
@@ -91,7 +96,7 @@
       },
       "stream-safe-creation.any.js": {
         "note": "tests are very finnicky",
-        "fail": [
+        "flaky": [
           "throwing Object.prototype.type accessor should not affect stream creation by 'fetch'",
           "Object.prototype.type accessor returning invalid value should not affect stream creation by 'fetch'",
           "throwing Object.prototype.highWaterMark accessor should not affect stream creation by 'fetch'",
@@ -127,6 +132,10 @@
           "Same-origin mode: 2 cookies"
         ]
       }
+    },
+    "fetch-later": {
+      "note": "this is not part of the spec, only a proposal",
+      "skip": true
     },
     "headers": {
       "header-setcookie.any.js": {
@@ -219,6 +228,10 @@
         ]
       },
       "redirect-keepalive.any.js": {
+        "note": "document is not defined",
+        "skip": true
+      },
+      "redirect-keepalive.https.any.js": {
         "note": "document is not defined",
         "skip": true
       },
@@ -327,7 +340,6 @@
           "Adding invalid request header \"Accept-Encoding: KO\"",
           "Adding invalid request header \"Access-Control-Request-Headers: KO\"",
           "Adding invalid request header \"Access-Control-Request-Method: KO\"",
-          "Adding invalid request header \"Access-Control-Request-Private-Network: KO\"",
           "Adding invalid request header \"Connection: KO\"",
           "Adding invalid request header \"Content-Length: KO\"",
           "Adding invalid request header \"Cookie: KO\"",
@@ -367,11 +379,15 @@
       }
     },
     "response": {
-      "response-clone.any.js": {
+      "response-blob-realm.any.js": {
+        "note": "onload is not defined (globalThis does not extend EventTarget)",
         "fail": [
-          "Check response clone use structureClone for teed ReadableStreams (ArrayBufferchunk)",
-          "Check response clone use structureClone for teed ReadableStreams (DataViewchunk)"
+          "realm of the Uint8Array from Response bytes()"
         ]
+      },
+      "response-clone.any.js": {
+        "note": "Node streams are too buggy currently.",
+        "skip": true
       },
       "response-consume-empty.any.js": {
         "fail": [
@@ -379,7 +395,8 @@
         ]
       },
       "response-consume-stream.any.js": {
-        "fail": [
+        "note": "only fail in node v18",
+        "flaky": [
           "Read blob response's body as readableStream with mode=byob",
           "Read text response's body as readableStream with mode=byob",
           "Read URLSearchParams response's body as readableStream with mode=byob",
@@ -387,16 +404,69 @@
           "Read form data response's body as readableStream with mode=byob"
         ]
       },
-      "response-error-from-stream.any.js": {
-        "fail": [
-          "ReadableStream start() Error propagates to Response.formData() Promise",
-          "ReadableStream pull() Error propagates to Response.formData() Promise"
-        ]
-      },
       "response-stream-with-broken-then.any.js": {
         "note": "this is a bug in webstreams, see https://github.com/nodejs/node/issues/46786",
         "skip": true
       }
+    },
+    "idlharness.any.js": {
+      "note": "https://github.com/nodejs/undici/issues/1666#issuecomment-1275177704",
+      "fail": [
+        "Window interface: operation fetch(RequestInfo, optional RequestInit)"
+      ]
+    }
+  },
+  "content-encoding": {
+    "br": {
+      "bad-br-body.https.any.js": {
+        "note": "TODO(@KhafraDev): investigate failure",
+        "fail": [
+          "Consuming the body of a resource with bad br content with arrayBuffer() should reject"
+        ]
+      },
+      "big-br-body.https.any.js": {
+        "note": "TODO(@KhafraDev): investigate failure",
+        "fail": [
+          "large br data should be decompressed successfully",
+          "large br data should be decompressed successfully with byte stream"
+        ]
+      },
+      "br-body.https.any.js": {
+        "note": "TODO(@KhafraDev): investigate failure",
+        "fail": [
+          "fetched br data with content type text should be decompressed.",
+          "fetched br data with content type octetstream should be decompressed."
+        ]
+      }
+    },
+    "gzip": {
+      "bad-gzip-body.any.js": {
+        "note": "TODO(@KhafraDev): investigate failure",
+        "fail": [
+          "Consuming the body of a resource with bad gzip content with arrayBuffer() should reject",
+          "Consuming the body of a resource with bad gzip content with blob() should reject",
+          "Consuming the body of a resource with bad gzip content with json() should reject",
+          "Consuming the body of a resource with bad gzip content with text() should reject"
+        ]
+      },
+      "gzip-body.any.js": {
+        "note": "TODO(@KhafraDev): investigate failure",
+        "fail": [
+          "fetched gzip data with content type text should be decompressed.",
+          "fetched gzip data with content type octetstream should be decompressed."
+        ]
+      },
+      "big-gzip-body.https.any.js": {
+        "note": "TODO(@KhafraDev): investigate failure",
+        "fail": [
+          "large gzip data should be decompressed successfully",
+          "large gzip data should be decompressed successfully with byte stream"
+        ]
+      }
+    },
+    "zstd": {
+      "note": "node does not have zstd yet",
+      "skip": true
     }
   },
   "content-length": {
@@ -431,6 +501,8 @@
   },
   "security": {
     "1xx-response.any.js": {
+      "note": "TODO(@KhafraDev): investigate timeout",
+      "skip": true,
       "fail": [
         "Status(100) should be ignored.",
         "Status(101) should be accepted, with removing body.",

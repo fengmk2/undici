@@ -1,24 +1,21 @@
 'use strict'
 
-const { test, skip } = require('tap')
-const { nodeMajor, nodeMinor } = require('../lib/core/util')
-const { createServer } = require('http')
-const { once } = require('events')
-const { createReadStream } = require('fs')
+const { tspl } = require('@matteo.collina/tspl')
+const { test, after } = require('node:test')
+const { createServer } = require('node:http')
+const { once } = require('node:events')
+const { createReadStream } = require('node:fs')
 const { File, FormData, request } = require('..')
 
-if (nodeMajor < 16 || (nodeMajor === 16 && nodeMinor < 8)) {
-  skip('FormData is not available in node < v16.8.0')
-  process.exit()
-}
-
 test('undici.request with a FormData body should set content-length header', async (t) => {
+  t = tspl(t, { plan: 1 })
+
   const server = createServer((req, res) => {
     t.ok(req.headers['content-length'])
     res.end()
   }).listen(0)
 
-  t.teardown(server.close.bind(server))
+  after(() => server.close())
   await once(server, 'listening')
 
   const body = new FormData()
@@ -31,12 +28,14 @@ test('undici.request with a FormData body should set content-length header', asy
 })
 
 test('undici.request with a FormData stream value should set transfer-encoding header', async (t) => {
+  t = tspl(t, { plan: 1 })
+
   const server = createServer((req, res) => {
-    t.equal(req.headers['transfer-encoding'], 'chunked')
+    t.strictEqual(req.headers['transfer-encoding'], 'chunked')
     res.end()
   }).listen(0)
 
-  t.teardown(server.close.bind(server))
+  after(() => server.close())
   await once(server, 'listening')
 
   class BlobFromStream {
