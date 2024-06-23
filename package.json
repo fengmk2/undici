@@ -125,7 +125,10 @@
     "standard": "^17.0.0",
     "tsd": "^0.31.0",
     "typescript": "^5.0.2",
-    "ws": "^8.11.0"
+    "ws": "^8.11.0",
+    "urllib2": "npm:urllib@2",
+    "urllib3": "npm:urllib@3",
+    "urllib4": "npm:urllib@4"
   },
   "engines": {
     "node": ">=18.17"
